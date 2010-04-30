@@ -54,15 +54,26 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
 (defun ghc-flymake-insert-type ()
   (interactive)
+  (flymake-goto-next-error)
   (let ((data (ghc-flymake-first-data)))
-    (if (and data
-	     (string-match "Inferred type: \\([^:]+ :: \\)\\(forall [^.]+\\. \\)?\\([^\0]*\\)" data))
+    (cond 
+     ((and data
+           (string-match "Inferred type: \\([^:]+ :: \\)\\(forall [^.]+\\. \\)?\\([^\0]*\\)" data))
+      (progn
+        (beginning-of-line)
+        (insert (match-string 1 data) (match-string 3 data) "\n")))
+     ((and data (string-match "Not in scope: `\\([^']+\\)'" data))
       (progn
 	(beginning-of-line)
-	(insert (match-string 1 data) (match-string 3 data) "\n"))
-      (message "No inferred type"))))
+        ;; next until blank
+        (forward-line -2)
+        ;; (previous-line)
+	(insert (match-string 1 data) " = undefined\n")))
+     (t
+      (message "No inferred type")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
