@@ -2,53 +2,24 @@ module List (listModules) where
 
 import Control.Applicative
 import Data.List
+import Exception
+import GHC
+import GHC.Paths (libdir)
+import Packages
 import Param
-import System.IO
-import System.Process
+import UniqFM
 
 ----------------------------------------------------------------
 
 listModules :: Options -> IO String
-listModules opt = convert opt . nub . sort . exposedModules <$> getDump opt
+listModules opt = convert opt . nub . sort <$> getModules
 
-getDump :: Options -> IO String
-getDump opt = do
-  (_,hout,_,_) <- runInteractiveProcess (ghcPkg opt) ["dump"] Nothing Nothing
-  hGetContents hout
-
-exposedModules :: String -> [String]
-exposedModules cs = results
+getModules :: IO [String]
+getModules = ghandle ignore $ runGhc (Just libdir) $ do
+    initSession
+    getExposedModules <$> getSessionDynFlags
   where
-    ls = unfoldLines cs
-    ns = values "name: " ls
-    ms = values "exposed-modules: " ls
-    zs = zip ns ms
-    xs = filter (\(nm,_) -> nm `notElem` ["ghc", "ghc-prim", "rts", "integer"]) zs
-    ss = map snd xs
-    results = filter (\x -> not ("GHC" `isPrefixOf` x)) $ concatMap words ss
-
-values :: String -> [String] -> [String]
-values tag ls = value
-  where
-    value = map (drop len) fs
-    len = length tag
-    fs = filter (tag `isPrefixOf`) ls
-
-----------------------------------------------------------------
-
-unfoldLines :: String -> [String]
-unfoldLines xs = self xs
-  where
-    splitNL = break (== '\n')
-    self "" = []
-    self s  = let (l, s') = splitNL s
-              in case s' of
-                []          -> [l]
-                (_:' ':s'') -> cont s'' l
-                (_:s'')     -> l : self s''
-    cont s a = let (l, s') = splitNL $ dropWhile (== ' ') s
-                   a' = a ++ " " ++ l
-               in case s' of
-                 []          -> [a']
-                 (_:' ':s'') -> cont s'' a'
-                 (_:s'')     -> a' : self s''
+    initSession = getSessionDynFlags >>= setSessionDynFlags
+    getExposedModules = map moduleNameString . concatMap exposedModules . eltsUFM . pkgIdMap . pkgState
+    ignore :: SomeException -> IO [String]
+    ignore _ = return []

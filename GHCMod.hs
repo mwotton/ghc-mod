@@ -2,10 +2,11 @@ module Main where
 
 import Browse
 import Check
+import Control.Applicative
 import Control.Exception hiding (try)
+import Lang
 import List
 import Param
-import Lang
 import Prelude hiding (catch)
 import System.Console.GetOpt
 import System.Environment (getArgs)
@@ -24,17 +25,12 @@ usage =    "ghc-mod version 0.4.0\n"
 ----------------------------------------------------------------
 
 defaultOptions :: Options
-defaultOptions = Options { convert = toPlain
-                         , ghcPkg  = "ghc-pkg"
-                         }
+defaultOptions = Options { convert = toPlain }
 
 argspec :: [OptDescr (Options -> Options)]
 argspec = [ Option "l" ["tolisp"]
             (NoArg (\opts -> opts { convert = toLisp }))
             "print as a list of Lisp"
-          , Option "p" ["ghc-pkg"]
-            (ReqArg (\str opts -> opts { ghcPkg = str }) "ghc-pkg")
-            "ghc-pkg path"
           ]
 
 parseArgs :: [OptDescr (Options -> Options)] -> [String] -> (Options, [String])
@@ -50,7 +46,7 @@ main = flip catch handler $ do
     args <- getArgs
     let (opt,cmdArg) = parseArgs argspec args
     res <- case head cmdArg of
-      "browse" -> browseModule opt (cmdArg !! 1)
+      "browse" -> concat <$> mapM (browseModule opt) (tail cmdArg)
       "list"   -> listModules opt
       "check"  -> checkSyntax opt (cmdArg !! 1)
       "lang"   -> listLanguages opt
