@@ -43,15 +43,14 @@ parseArgs spec argv
 
 main :: IO ()
 main = flip catch handler $ do
-    args <- getArgs
-    let (opt,cmdArg) = parseArgs argspec args
-    res <- case head cmdArg of
-      "browse" -> concat <$> mapM (browseModule opt) (tail cmdArg)
-      "list"   -> listModules opt
-      "check"  -> checkSyntax opt (cmdArg !! 1)
-      "lang"   -> listLanguages opt
-      _        -> error usage
-    putStr res
+        (opt,(cmd:rest)) <- parseArgs argspec <$> getArgs
+        res <- case cmd of
+               "browse" -> concat <$> mapM (browseModule opt) rest
+               "list"   -> listModules opt
+               "check"  -> checkSyntax opt (head rest)
+               "lang"   -> listLanguages opt
+               _        -> error usage
+        putStr res
   where
     handler :: ErrorCall -> IO ()
     handler _ = putStr usage
