@@ -68,6 +68,7 @@ main = flip catch handler $ do
          return $ mods ++ langs ++ pre
       _        -> error usage
     putStr res
+
   where
     handler :: ErrorCall -> IO ()
     handler _ = putStr usage

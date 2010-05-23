@@ -22,8 +22,10 @@ checkSyntax _ file = unlines <$> check file
 ----------------------------------------------------------------
 
 check :: String -> IO [String]
-check fileName = withGHC $ do
-    ref <- liftIO $ newIORef []
+check fileName = do
+  putStrLn $ "Checking "  ++ fileName ++ "..."
+  ref <- newIORef []
+  withGHC $ do
     initSession
     setTargetFile fileName
     loadWithLogger (refLogger ref) LoadAllTargets `gcatch` handleParseError ref
@@ -49,10 +51,10 @@ cmdOptions = map noLoc ["-Wall","-fno-warn-unused-do-bind"]
 ----------------------------------------------------------------
 
 refLogger :: IORef [String] -> WarnErrLogger
-refLogger ref Nothing =
-    (errBagToStrList <$> getWarnings) >>= liftIO . writeIORef ref
-refLogger ref (Just e) =
-    liftIO . writeIORef ref $ errBagToStrList . srcErrorMessages $ e
+refLogger ref i = do 
+  errWarns <- maybe getWarnings (return . srcErrorMessages) i
+  liftIO $ writeIORef ref $ errBagToStrList errWarns
+  clearWarnings
 
 errBagToStrList :: Bag ErrMsg -> [String]
 errBagToStrList = map showErrMsg . reverse . bagToList
