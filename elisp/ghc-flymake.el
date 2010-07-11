@@ -10,12 +10,18 @@
 
 (require 'flymake)
 
-(defvar ghc-error-buffer-name "*GHC Errors*")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defvar ghc-flymake-allowed-file-name-masks
+(defvar ghc-hlint-options nil "*Hlint options")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defconst ghc-error-buffer-name "*GHC Errors*")
+
+(defconst ghc-flymake-allowed-file-name-masks
   '("\\.l?hs$" ghc-flymake-init flymake-simple-cleanup flymake-get-real-file-name))
 
-(defvar ghc-flymake-err-line-patterns
+(defconst ghc-flymake-err-line-patterns
   '("^\\(.*\\.l?hs\\):\\([0-9]+\\):\\([0-9]+\\):[ ]*\\(.+\\)" 1 2 3 4))
 
 (add-to-list 'flymake-allowed-file-name-masks
@@ -30,15 +36,14 @@
   (let ((after-save-hook nil))
     (save-buffer))
   (let ((file (file-name-nondirectory (buffer-file-name))))
-    (list ghc-module-command (ghc-flymake-command file))))
-
-(defvar ghc-hlint (ghc-which "hlint"))
+    (list ghc-module-command (ghc-flymake-command file ghc-hlint-options))))
 
 (defvar ghc-flymake-command nil) ;; nil: check, t: lint
 
-(defun ghc-flymake-command (file)
+(defun ghc-flymake-command (file opts)
    (if ghc-flymake-command
-       (list "-f" ghc-hlint "lint" file)
+       (let ((hopts (ghc-mapconcat (lambda (x) (list "-h" x)) opts)))
+	 `(,@hopts "lint" ,file))
      (list "check" file)))
 
 (defun ghc-flymake-toggle-command ()
@@ -64,7 +69,7 @@
 
 (defun ghc-flymake-insert-errors (title errs)
   (save-excursion
-    (insert title "\n")
+    (insert title "\n\n")
     (mapc (lambda (x) (insert (ghc-replace-character x ghc-null ghc-newline) "\n")) errs)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -79,12 +84,28 @@
 	(insert (match-string 1 data)
 		(replace-regexp-in-string "\\[Char\\]" "String" (match-string 3 data))
 		"\n"))
+       ((string-match "lacks an accompanying binding" data)
+	(beginning-of-line)
+	(when (looking-at "^\\([^ ]+\\) *::")
+	  (save-match-data
+	    (forward-line)
+	    (if (eobp) (insert "\n")))
+	  (insert (match-string 1) " = undefined\n")))
        ((string-match "Not in scope: `\\([^']+\\)'" data)
 	(save-match-data
 	  (unless (re-search-forward "^$" nil t)
 	    (goto-char (point-max))
 	    (insert "\n")))
-	(insert "\n" (match-string 1 data) " = undefined\n"))))))
+	(insert "\n" (match-string 1 data) " = undefined\n"))
+       ((string-match "Found:\0[ ]*\\([^\0]+\\)\0Why not:\0[ ]*\\([^\0]+\\)" data)
+	(let ((old (match-string 1 data))
+	      (new (match-string 2 data)))
+	  (beginning-of-line)
+	  (when (search-forward old nil t)
+	    (let ((end (point)))
+	      (search-backward old nil t)
+	      (delete-region (point) end))
+	    (insert new))))))))
 
 
 ;; (defun ghc-flymake-insert-type ()

@@ -5,8 +5,8 @@ import GHC
 import GHC.Paths (libdir)
 
 data Options = Options {
-    convert :: [String] -> String
-  , hlint   :: String
+    convert   :: [String] -> String
+  , hlintOpts :: [String]
   }
 
 withGHC :: Ghc [String] -> IO [String]
